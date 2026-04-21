@@ -27,12 +27,12 @@ int main() {
     cur_counts.resize(2); // level 1 has 1 node at index 1
     cur_counts[1] = n;
 
-    // For endpoint for the last ball, we traverse using parity rule:
-    // At a node with k balls arriving initially closed, first ball goes left, toggles open; subsequent alternate.
-    // The last ball direction: left if k is odd, right if k is even.
-    // We can compute for the last ball by walking levels using these counts.
-    int node = 1;
-    int endpoint_idx_bits = 0; // left=0, right=1 bits
+    // For the last ball path: at a node with k balls (initially closed),
+    // last direction is left if k is odd, right if k is even.
+    // We'll track the path index within the level arrays (path_idx) and
+    // the heap index of the node reached (leaf_index).
+    int path_idx = 1;          // index within current level counts (1-based)
+    int leaf_switch_index = 1; // heap index of leaf switch (level D)
 
     for (int level = 1; level <= (int)D; ++level) {
         // Prepare next level counts vector
@@ -60,34 +60,22 @@ int main() {
             next_counts[right_child_idx] += right_count;
         }
 
-        // Determine last ball direction at the path node for endpoint index bits
-        // We need the count k at the specific node along the last ball path.
-        // To track this, we also need to know the (level, idx) of the node we are at.
-        // We can derive idx along the path using previous decisions. Maintain path_idx_at_level.
-        static vector<int> path_idx; // reused across runs; but here only once
-        if (level == 1) path_idx.assign((size_t)D + 1, 0);
-        if (level == 1) path_idx[level] = 1;
-        else {
-            // compute idx based on previous bit
-            int prev_idx = path_idx[level - 1];
-            int bit = (endpoint_idx_bits >> (level - 2)) & 1; // previous decision
-            path_idx[level] = prev_idx * 2 - (bit == 0 ? 1 : 0) + (bit == 1 ? 0 : 0);
-            // Actually easier: if bit 0 (left), new idx = prev_idx*2-1; if bit 1 (right), new idx = prev_idx*2
-            path_idx[level] = (bit == 0) ? (prev_idx * 2 - 1) : (prev_idx * 2);
-        }
-
-        long long k_path = cur_counts[path_idx[level]];
+        // Determine last ball direction at current node along path
+        long long k_path = cur_counts[path_idx];
         int dir_bit = (int)((k_path & 1LL) ? 0 : 1); // odd -> left(0), even -> right(1)
-        endpoint_idx_bits = (endpoint_idx_bits << 1) | dir_bit;
+        if (level < (int)D) {
+            // Update heap index of the leaf switch reached by decisions up to level D-1
+            leaf_switch_index = leaf_switch_index * 2 + dir_bit; // left: *2, right: *2+1
+            // Update path_idx for next level in the level-arranged arrays
+            path_idx = (dir_bit == 0) ? (path_idx * 2 - 1) : (path_idx * 2);
+        }
 
         // Advance to next level counts
         cur_counts.swap(next_counts);
     }
 
-    int endpoint_index = endpoint_idx_bits + 1; // left-to-right numbering
-
     // Output
-    cout << endpoint_index << '\n';
+    cout << leaf_switch_index << '\n';
     int leaf_start = 1 << (D - 1);
     int leaf_end = (1 << D) - 1;
     for (int i = leaf_start; i <= leaf_end; ++i) {
@@ -98,4 +86,3 @@ int main() {
 
     return 0;
 }
-
